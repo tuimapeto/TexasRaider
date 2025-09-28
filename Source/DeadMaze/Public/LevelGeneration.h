@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include <queue>
 #include <vector>
+#include <tuple>
 #include "LevelGeneration.generated.h"
 
 struct Cell
@@ -13,9 +14,10 @@ struct Cell
 
 enum class RoomType
 {
-    TwoExit = 0,
-    ThreeExit = 1,
-    FourExit = 2
+    OneExit = 0,
+    TwoExit = 1,
+    ThreeExit = 2,
+    FourExit = 3
 };
 
 class Room
@@ -31,8 +33,12 @@ public:
             exits.emplace_back(roomSizeX - 1, roomSizeY / 2);
         }
 
-        m_roomWorldLocationX = roomWorldLocX;
-        m_roomWorldLocationY = roomWorldLocY;
+        m_roomWorldLocation.X = roomWorldLocX;
+        m_roomWorldLocation.Y = roomWorldLocY;
+        m_roomWorldLocation.Z = 0;
+
+        m_roomSizeX = roomSizeX;
+        m_roomSizeY = roomSizeY;
     }
 
     FVector GetExitExactLocation(int exitIndex) const
@@ -40,8 +46,8 @@ public:
         if (exits.size() >= exitIndex)
         {
             FVector exitLocation;
-            exitLocation.X = exits[exitIndex].x + m_roomWorldLocationX;
-            exitLocation.Y = exits[exitIndex].y + m_roomWorldLocationY;
+            exitLocation.X = exits[exitIndex].x + m_roomWorldLocation.X;
+            exitLocation.Y = exits[exitIndex].y + m_roomWorldLocation.Y;
             exitLocation.Z = 0;
 
             return exitLocation;    
@@ -52,11 +58,28 @@ public:
             return FVector(0, 0, 0);
         }
     }
+
+    FVector GetRoomWorldLocation() const
+    {
+        return m_roomWorldLocation;
+    }
+
+    std::tuple<int, int> GetRoomSize() const
+    {
+        return std::make_tuple(m_roomSizeX, m_roomSizeY);
+    }
+
+    AActor* m_roomMesh;
+    
 private:
     std::vector<Cell> exits;
     
-    int m_roomWorldLocationX = 0;
-    int m_roomWorldLocationY = 0;
+    FVector m_roomWorldLocation;
+
+    int m_roomSizeX;
+    int m_roomSizeY;
+
+    
 };
 
 UCLASS()
@@ -79,14 +102,26 @@ protected:
 
     UPROPERTY(EditAnywhere, Category = "Level Generation")
     TSubclassOf<AActor> TreasureClass;
+
+    UPROPERTY(EditAnywhere, Category = "Level Generation")
+    TSubclassOf<AActor> RoomThreeExit;
+
+    UPROPERTY(EditAnywhere, Category = "Level Generation")
+    TSubclassOf<AActor> RoomOneExit;
     
 public:
     virtual void Tick(float DeltaTime) override;
 
 private:
-    void GenerateLevel();
+    void GenerateGrid();
     bool IsCellReachableAfterWall(int wx, int wy, Cell entrance, Cell exit);
+    bool CheckRoomOverlap(Room extraRoom) const;
+
+    void CreateRooms();
+    void CreatePassages();
 
     const int MAZESIZE = 34;
     FString MazeGrid[34][34];
+
+    std::vector<Room> generatedRooms;
 };

@@ -12,7 +12,7 @@ void ALevelGeneration::BeginPlay()
 {
 	Super::BeginPlay();
 	UE_LOG(LogTemp, Warning, TEXT("BeginPlay called"));
-	GenerateLevel();
+	GenerateGrid();
 }
 
 void ALevelGeneration::Tick(float DeltaTime)
@@ -20,7 +20,7 @@ void ALevelGeneration::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-void ALevelGeneration::GenerateLevel()
+void ALevelGeneration::GenerateGrid()
 {
 	srand(time(NULL));
 	UE_LOG(LogTemp, Warning, TEXT("Spawning key"));
@@ -227,8 +227,10 @@ void ALevelGeneration::GenerateLevel()
 					//UE_LOG(LogTemp, Warning, TEXT("Spawning wall at (%d, %d)"), i, j);
 					if (rand() % 6 == 0)
 					{
-						GetWorld()->SpawnActor<AActor>(WallClass, SpawnLocation + FVector(0, 0, 100.0f), FRotator::ZeroRotator);
-						GetWorld()->SpawnActor<AActor>(WallClass, SpawnLocation + FVector(0, 0, 200.0f), FRotator::ZeroRotator);
+						GetWorld()->SpawnActor<AActor>(WallClass, SpawnLocation + FVector(0, 0, 100.0f),
+						                               FRotator::ZeroRotator);
+						GetWorld()->SpawnActor<AActor>(WallClass, SpawnLocation + FVector(0, 0, 200.0f),
+						                               FRotator::ZeroRotator);
 					}
 				}
 			}
@@ -360,8 +362,84 @@ bool ALevelGeneration::IsCellReachableAfterWall(int wx, int wy, Cell entrance, C
 			}
 		}
 	}
- 
+
 	// Restore old value
 	MazeGrid[wy][wx] = oldValue;
 	return exitFound;
+}
+
+bool ALevelGeneration::CheckRoomOverlap(Room extraRoom) const
+{
+	//int roomSize;
+	for (int j = 0; j < generatedRooms.size(); j++)
+	{
+		bool yOverlapping = false;
+		bool xOverlapping = false;
+
+		FVector generatedRoomLocation = generatedRooms[j].GetRoomWorldLocation();
+		FVector extraRoomLocation = extraRoom.GetRoomWorldLocation();
+
+		auto [extraRoomSizeX, extraRoomSizeY] = extraRoom.GetRoomSize();
+		auto [generatedRoomSizeX, generatedRoomSizeY] = generatedRooms[j].GetRoomSize();
+
+		if (extraRoomLocation.X + extraRoomSizeX / 2 > generatedRoomLocation.X - generatedRoomSizeX / 2
+			&& extraRoomLocation.X - extraRoomSizeX / 2 < generatedRoomLocation.X + generatedRoomSizeX / 2)
+		{
+			xOverlapping = true;
+		}
+
+		if (extraRoomLocation.Y + extraRoomSizeY / 2 > generatedRoomLocation.Y - generatedRoomSizeY / 2
+			&& extraRoomLocation.Y - extraRoomSizeX / 2 < generatedRoomLocation.Y + generatedRoomSizeY / 2)
+		{
+			yOverlapping = true;
+		}
+
+		if (yOverlapping && xOverlapping)
+		{
+			yOverlapping = false;
+			xOverlapping = false;
+			return true;
+		}
+	}
+	return false;
+}
+
+void ALevelGeneration::CreateRooms()
+{
+	srand(time(NULL));
+
+	//create two rooms
+	if (rand() % 2 == 0)
+	{
+		int numRooms = 2;
+		//create the entrance room first, it has an entrance, exit to next level and a third exit to another room
+		Room entranceRoom(RoomType::ThreeExit, 34, 34, rand() % 10000 - 5000, rand() % 10000 - 5000);
+
+		AActor* roomRef = GetWorld()->SpawnActor<AActor>(RoomThreeExit, entranceRoom.GetRoomWorldLocation(),
+		                                                 FRotator::ZeroRotator);
+		entranceRoom.m_roomMesh = roomRef;
+
+		generatedRooms.emplace_back(entranceRoom);
+
+		for (int i = 0; i < numRooms - 1; i++)
+		{
+			redoPoint:
+			int roomSize = rand() % 20 + 20;
+			Room extraRoom(RoomType::OneExit, roomSize, roomSize, rand() % 10000 - 5000, rand() % 10000 - 5000);
+
+			//check overlapping of rooms
+
+			if (CheckRoomOverlap(extraRoom)) goto redoPoint;
+
+			AActor* extraRoomRef = GetWorld()->SpawnActor<AActor>(RoomOneExit, extraRoom.GetRoomWorldLocation(),
+			                                                      FRotator::ZeroRotator);
+			extraRoom.m_roomMesh = extraRoomRef;
+
+			generatedRooms.emplace_back(extraRoom);
+		}
+	}
+}
+
+void ALevelGeneration::CreatePassages()
+{
 }
