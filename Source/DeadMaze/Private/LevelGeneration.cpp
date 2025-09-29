@@ -368,7 +368,7 @@ bool ALevelGeneration::IsCellReachableAfterWall(int wx, int wy, Cell entrance, C
 	return exitFound;
 }
 
-bool ALevelGeneration::CheckRoomOverlap(Room extraRoom) const
+bool ALevelGeneration::CheckRoomOverlap(const Room& extraRoom) const
 {
 	//int roomSize;
 	for (int j = 0; j < generatedRooms.size(); j++)

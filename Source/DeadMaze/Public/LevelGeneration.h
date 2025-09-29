@@ -115,7 +115,7 @@ public:
 private:
     void GenerateGrid();
     bool IsCellReachableAfterWall(int wx, int wy, Cell entrance, Cell exit);
-    bool CheckRoomOverlap(Room extraRoom) const;
+    bool CheckRoomOverlap(const Room& extraRoom) const;
 
     void CreateRooms();
     void CreatePassages();
