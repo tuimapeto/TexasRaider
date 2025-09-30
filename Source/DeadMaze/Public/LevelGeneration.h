@@ -5,6 +5,7 @@
 #include <queue>
 #include <vector>
 #include <tuple>
+#include <random>
 #include "LevelGeneration.generated.h"
 
 struct Cell
@@ -23,7 +24,7 @@ enum class RoomType
 class Room
 {
 public:
-    Room(RoomType roomType, int roomSizeX, int roomSizeY, int roomWorldLocX, int roomWorldLocY)
+    Room(RoomType roomType, int roomSizeX, int roomSizeY, float roomWorldLocX, float roomWorldLocY)
     {
         if (roomType == RoomType::TwoExit)
         {
@@ -31,6 +32,8 @@ public:
             
             exits.emplace_back(0, roomSizeY / 2);
             exits.emplace_back(roomSizeX - 1, roomSizeY / 2);
+
+            m_roomType = roomType;
         }
 
         m_roomWorldLocation.X = roomWorldLocX;
@@ -70,6 +73,7 @@ public:
     }
 
     AActor* m_roomMesh;
+    RoomType m_roomType;
     
 private:
     std::vector<Cell> exits;
@@ -108,6 +112,12 @@ protected:
 
     UPROPERTY(EditAnywhere, Category = "Level Generation")
     TSubclassOf<AActor> RoomOneExit;
+
+    UPROPERTY(EditAnywhere, Category = "Level Generation")
+    TSubclassOf<AActor> RoomTwoExit;
+
+    UPROPERTY(EditAnywhere, Category = "Level Generation")
+    TSubclassOf<AActor> RoomFourExit;
     
 public:
     virtual void Tick(float DeltaTime) override;
@@ -124,4 +134,8 @@ private:
     FString MazeGrid[34][34];
 
     std::vector<Room> generatedRooms;
+
+    //constants
+    const float WORLDLOCATIONOFFSET = 15000.0f;
+    const float DEFAULTROOMSIZE = 2000.0f;
 };

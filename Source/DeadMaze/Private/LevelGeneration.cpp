@@ -13,6 +13,7 @@ void ALevelGeneration::BeginPlay()
 	Super::BeginPlay();
 	UE_LOG(LogTemp, Warning, TEXT("BeginPlay called"));
 	GenerateGrid();
+	CreateRooms();
 }
 
 void ALevelGeneration::Tick(float DeltaTime)
@@ -406,38 +407,65 @@ bool ALevelGeneration::CheckRoomOverlap(const Room& extraRoom) const
 
 void ALevelGeneration::CreateRooms()
 {
+	//random initialize
 	srand(time(NULL));
+	std::random_device rd;  // Seed
+	std::mt19937 gen(rd()); // Mersenne Twister engine
 
-	//create two rooms
-	if (rand() % 2 == 0)
+	//room amount from 1-3
+	int numExtraRooms = rand() % 3 + 1;
+
+	// Define your float distributions
+	std::uniform_real_distribution<float> distribution(-WORLDLOCATIONOFFSET / 2.0f, WORLDLOCATIONOFFSET / 2.0f);
+	float worldLocationX = distribution(gen);
+	float worldLocationY = distribution(gen);
+	
+	//create the entrance room first, it has an entrance, exit to next level and a third exit to another room, sometimes a fourth exit
+	Room entranceRoom(numExtraRooms == 3 ? RoomType::FourExit : RoomType::ThreeExit, 34, 34, worldLocationX, worldLocationY);
+
+	//mesh creation and reference
+	AActor* roomRef = GetWorld()->SpawnActor<AActor>(entranceRoom.m_roomType == RoomType::FourExit ? RoomFourExit : RoomThreeExit, entranceRoom.GetRoomWorldLocation(),
+													 FRotator::ZeroRotator);
+	//scale the room to make rooms of different sizes
+	
+	auto [meshScaleX, meshScaleY] = entranceRoom.GetRoomSize();
+	roomRef->SetActorScale3D(FVector(meshScaleX / DEFAULTROOMSIZE, meshScaleY / DEFAULTROOMSIZE, 1.0f));
+	entranceRoom.m_roomMesh = roomRef;
+
+	generatedRooms.emplace_back(entranceRoom);
+
+	//create the extra rooms!
+	for (int i = 0; i < numExtraRooms; i++)
 	{
-		int numRooms = 2;
-		//create the entrance room first, it has an entrance, exit to next level and a third exit to another room
-		Room entranceRoom(RoomType::ThreeExit, 34, 34, rand() % 10000 - 5000, rand() % 10000 - 5000);
+		redoPoint:
+		int roomSizeX = rand() % 20 + 20;
+		int roomSizeY = rand() % 20 + 20;
 
-		AActor* roomRef = GetWorld()->SpawnActor<AActor>(RoomThreeExit, entranceRoom.GetRoomWorldLocation(),
-		                                                 FRotator::ZeroRotator);
-		entranceRoom.m_roomMesh = roomRef;
+		float extraRoomWorldLocationX = distribution(gen);
+		float extraRoomWorldLocationY = distribution(gen);
 
-		generatedRooms.emplace_back(entranceRoom);
+		//number of exits
+		int roomTypeIndex = rand() % 3 + 1;
+		
+		Room extraRoom(static_cast<RoomType>(roomTypeIndex), roomSizeX, roomSizeY, extraRoomWorldLocationX ,extraRoomWorldLocationY);
 
-		for (int i = 0; i < numRooms - 1; i++)
-		{
-			redoPoint:
-			int roomSize = rand() % 20 + 20;
-			Room extraRoom(RoomType::OneExit, roomSize, roomSize, rand() % 10000 - 5000, rand() % 10000 - 5000);
+		//check overlapping of rooms
 
-			//check overlapping of rooms
+		if (CheckRoomOverlap(extraRoom)) goto redoPoint;
 
-			if (CheckRoomOverlap(extraRoom)) goto redoPoint;
+		AActor* extraRoomRef = GetWorld()->SpawnActor<AActor>(RoomOneExit, extraRoom.GetRoomWorldLocation(),
+															  FRotator::ZeroRotator);
 
-			AActor* extraRoomRef = GetWorld()->SpawnActor<AActor>(RoomOneExit, extraRoom.GetRoomWorldLocation(),
-			                                                      FRotator::ZeroRotator);
-			extraRoom.m_roomMesh = extraRoomRef;
+		//scaling
+		auto [extraRoomMeshScaleX, extraRoomMeshScaleY] = extraRoom.GetRoomSize();
+		extraRoomRef->SetActorScale3D(FVector((extraRoomMeshScaleX * 100.0f) / DEFAULTROOMSIZE, (extraRoomMeshScaleY * 100.0f) / DEFAULTROOMSIZE, 1.0f));
+		
+		extraRoom.m_roomMesh = extraRoomRef;
 
-			generatedRooms.emplace_back(extraRoom);
-		}
+		generatedRooms.emplace_back(extraRoom);
 	}
+
+	
 }
 
 void ALevelGeneration::CreatePassages()
