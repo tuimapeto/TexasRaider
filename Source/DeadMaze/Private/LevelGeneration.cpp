@@ -6,6 +6,15 @@ ALevelGeneration::ALevelGeneration()
 {
 	PrimaryActorTick.bCanEverTick = false; // No need to tick unless you want live updates
 	UE_LOG(LogTemp, Warning, TEXT("BeginPlay called"));
+
+	//fill world grid
+	for (int i = 0; i < worldSize; i++)
+	{
+		for (int j = 0; j < worldSize; j++)
+		{
+			worldOccupancyGrid[i][j] = "walkable";
+		}
+	}
 }
 
 void ALevelGeneration::BeginPlay()
@@ -14,6 +23,10 @@ void ALevelGeneration::BeginPlay()
 	UE_LOG(LogTemp, Warning, TEXT("BeginPlay called"));
 	GenerateGrid();
 	CreateRooms();
+	MakeExits();
+	CreatePassages();
+	FillWalls();
+	DecorateRooms();
 }
 
 void ALevelGeneration::Tick(float DeltaTime)
@@ -377,22 +390,33 @@ bool ALevelGeneration::CheckRoomOverlap(const Room& extraRoom) const
 		bool yOverlapping = false;
 		bool xOverlapping = false;
 
+		//get locations and room sizes
 		FVector generatedRoomLocation = generatedRooms[j].GetRoomWorldLocation();
 		FVector extraRoomLocation = extraRoom.GetRoomWorldLocation();
 
 		auto [extraRoomSizeX, extraRoomSizeY] = extraRoom.GetRoomSize();
 		auto [generatedRoomSizeX, generatedRoomSizeY] = generatedRooms[j].GetRoomSize();
 
-		if (extraRoomLocation.X + extraRoomSizeX / 2 > generatedRoomLocation.X - generatedRoomSizeX / 2
-			&& extraRoomLocation.X - extraRoomSizeX / 2 < generatedRoomLocation.X + generatedRoomSizeX / 2)
+		//scale to centimeters ??
+		extraRoomSizeX *= 100.0f;
+		extraRoomSizeY *= 100.0f;
+		generatedRoomSizeX *= 100.0f;
+		generatedRoomSizeY *= 100.0f;
+
+		//check overlapping for y and x axes
+
+		if (extraRoomLocation.X + extraRoomSizeX / 2.0f > generatedRoomLocation.X - generatedRoomSizeX / 2.0f
+			&& extraRoomLocation.X - extraRoomSizeX / 2.0f < generatedRoomLocation.X + generatedRoomSizeX / 2.0f)
 		{
 			xOverlapping = true;
+			UE_LOG(LogTemp, Warning, TEXT("x overlap!"));
 		}
 
-		if (extraRoomLocation.Y + extraRoomSizeY / 2 > generatedRoomLocation.Y - generatedRoomSizeY / 2
-			&& extraRoomLocation.Y - extraRoomSizeX / 2 < generatedRoomLocation.Y + generatedRoomSizeY / 2)
+		if (extraRoomLocation.Y + extraRoomSizeY / 2.0f > generatedRoomLocation.Y - generatedRoomSizeY / 2.0f
+			&& extraRoomLocation.Y - extraRoomSizeX / 2.0f < generatedRoomLocation.Y + generatedRoomSizeY / 2.0f)
 		{
 			yOverlapping = true;
+			UE_LOG(LogTemp, Warning, TEXT("y overlap!"));
 		}
 
 		if (yOverlapping && xOverlapping)
@@ -409,27 +433,52 @@ void ALevelGeneration::CreateRooms()
 {
 	//random initialize
 	srand(time(NULL));
-	std::random_device rd;  // Seed
+	std::random_device rd; // Seed
 	std::mt19937 gen(rd()); // Mersenne Twister engine
 
 	//room amount from 1-3
-	int numExtraRooms = rand() % 3 + 1;
+	int numExtraRooms = rand() % 2 + 1;
+	//int numExtraRooms = 1;
 
-	// Define your float distributions
-	std::uniform_real_distribution<float> distribution(-WORLDLOCATIONOFFSET / 2.0f, WORLDLOCATIONOFFSET / 2.0f);
+	// Define float distributions
+	std::uniform_real_distribution<float> distribution(-WORLDLOCATIONOFFSET / 2.0f + 2000.0f,
+	                                                   WORLDLOCATIONOFFSET / 2.0f - 2000.0f);
 	float worldLocationX = distribution(gen);
 	float worldLocationY = distribution(gen);
-	
+
+	//snap to even meters
+	auto SnapToEvenMeter = [](float valueCm) -> float
+	{
+		// Convert to meters
+		float meters = valueCm / 100.0f;
+
+		// Round to nearest even integer (meters)
+		int roundedMeters = FMath::RoundToInt(meters);
+
+		// Convert back to cm
+		return roundedMeters * 100.0f;
+	};
+
+	worldLocationX = SnapToEvenMeter(worldLocationX);
+	worldLocationY = SnapToEvenMeter(worldLocationY);
+
 	//create the entrance room first, it has an entrance, exit to next level and a third exit to another room, sometimes a fourth exit
-	Room entranceRoom(numExtraRooms == 3 ? RoomType::FourExit : RoomType::ThreeExit, 34, 34, worldLocationX, worldLocationY);
+	Room entranceRoom(numExtraRooms > 1 ? RoomType::FourExit : RoomType::ThreeExit, 34.0f, 34.0f, -300.0f, 200.0f);
 
 	//mesh creation and reference
-	AActor* roomRef = GetWorld()->SpawnActor<AActor>(entranceRoom.m_roomType == RoomType::FourExit ? RoomFourExit : RoomThreeExit, entranceRoom.GetRoomWorldLocation(),
-													 FRotator::ZeroRotator);
+	AActor* roomRef = GetWorld()->SpawnActor<AActor>(
+		entranceRoom.m_roomType == RoomType::FourExit ? RoomFourExit : RoomThreeExit,
+		entranceRoom.GetRoomWorldLocation(),
+		FRotator::ZeroRotator);
 	//scale the room to make rooms of different sizes
-	
+
 	auto [meshScaleX, meshScaleY] = entranceRoom.GetRoomSize();
-	roomRef->SetActorScale3D(FVector(meshScaleX / DEFAULTROOMSIZE, meshScaleY / DEFAULTROOMSIZE, 1.0f));
+	roomRef->SetActorScale3D(FVector((meshScaleX * 100.0f) / DEFAULTROOMSIZE, (meshScaleY * 100.0f) / DEFAULTROOMSIZE,
+	                                 1.0f));
+
+	//reserve room space
+	ReserveRoomSpace(entranceRoom);
+
 	entranceRoom.m_roomMesh = roomRef;
 
 	generatedRooms.emplace_back(entranceRoom);
@@ -437,37 +486,424 @@ void ALevelGeneration::CreateRooms()
 	//create the extra rooms!
 	for (int i = 0; i < numExtraRooms; i++)
 	{
-		redoPoint:
+	redoPoint:
 		int roomSizeX = rand() % 20 + 20;
 		int roomSizeY = rand() % 20 + 20;
 
+		// worldlocation snap
 		float extraRoomWorldLocationX = distribution(gen);
 		float extraRoomWorldLocationY = distribution(gen);
 
+		extraRoomWorldLocationX = SnapToEvenMeter(extraRoomWorldLocationX);
+		extraRoomWorldLocationY = SnapToEvenMeter(extraRoomWorldLocationY);
+
 		//number of exits
-		int roomTypeIndex = rand() % 3 + 1;
-		
-		Room extraRoom(static_cast<RoomType>(roomTypeIndex), roomSizeX, roomSizeY, extraRoomWorldLocationX ,extraRoomWorldLocationY);
+		int roomTypeIndex = rand() % 2 + 1;
+
+		Room extraRoom(static_cast<RoomType>(roomTypeIndex), static_cast<float>(roomSizeX), static_cast<
+			               float>(roomSizeY), extraRoomWorldLocationX, extraRoomWorldLocationY);
 
 		//check overlapping of rooms
 
-		if (CheckRoomOverlap(extraRoom)) goto redoPoint;
+		if (CheckRoomOverlap(extraRoom))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Going to redo point!"));
+			goto redoPoint;
+		}
 
-		AActor* extraRoomRef = GetWorld()->SpawnActor<AActor>(RoomOneExit, extraRoom.GetRoomWorldLocation(),
-															  FRotator::ZeroRotator);
+		AActor* extraRoomRef = nullptr;
+
+		switch (roomTypeIndex)
+		{
+		case 1:
+			extraRoomRef = GetWorld()->SpawnActor<AActor>(RoomOneExit, extraRoom.GetRoomWorldLocation(),
+			                                              FRotator::ZeroRotator);
+			break;
+		case 2:
+			extraRoomRef = GetWorld()->SpawnActor<AActor>(RoomTwoExit, extraRoom.GetRoomWorldLocation(),
+			                                              FRotator::ZeroRotator);
+			break;
+		default:
+			extraRoomRef = GetWorld()->SpawnActor<AActor>(RoomOneExit, extraRoom.GetRoomWorldLocation(),
+			                                              FRotator::ZeroRotator);
+		}
 
 		//scaling
 		auto [extraRoomMeshScaleX, extraRoomMeshScaleY] = extraRoom.GetRoomSize();
-		extraRoomRef->SetActorScale3D(FVector((extraRoomMeshScaleX * 100.0f) / DEFAULTROOMSIZE, (extraRoomMeshScaleY * 100.0f) / DEFAULTROOMSIZE, 1.0f));
-		
+
+		if (roomTypeIndex == 2)
+		{
+			extraRoomRef->SetActorScale3D(FVector((extraRoomMeshScaleY * 100.0f) / DEFAULTROOMSIZE,
+											  (extraRoomMeshScaleX * 100.0f) / DEFAULTROOMSIZE, 1.0f));
+		}
+
+		else if (roomTypeIndex == 1)
+		{
+			extraRoomRef->SetActorScale3D(FVector((extraRoomMeshScaleX * 100.0f) / DEFAULTROOMSIZE,
+											  (extraRoomMeshScaleY * 100.0f) / DEFAULTROOMSIZE, 1.0f));
+		}
+
+		//reserve room space
+		ReserveRoomSpace(extraRoom);
+
 		extraRoom.m_roomMesh = extraRoomRef;
 
+		UE_LOG(LogTemp, Warning, TEXT("The integer value is: %d....%d"), roomSizeX, roomSizeY);
 		generatedRooms.emplace_back(extraRoom);
 	}
-
-	
 }
 
 void ALevelGeneration::CreatePassages()
 {
+	Cell startCell = WorldToGrid(generatedRooms[0].GetExitExactLocation(0));
+	Cell goalCell = WorldToGrid(generatedRooms[1].GetExitExactLocation(0));
+
+	UStaticMesh* SphereMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	if (SphereMesh)
+	{
+		AStaticMeshActor* SphereActor = GetWorld()->SpawnActor<AStaticMeshActor>(
+			AStaticMeshActor::StaticClass(), generatedRooms[0].GetExitExactLocation(0),
+			FRotator::ZeroRotator
+		);
+
+		if (SphereActor)
+		{
+			SphereActor->GetStaticMeshComponent()->SetStaticMesh(SphereMesh);
+			SphereActor->SetMobility(EComponentMobility::Movable);
+			SphereActor->SetActorEnableCollision(false);
+		}
+	}
+
+	auto path = FindCorridorPath(startCell, goalCell);
+
+	for (auto& loc : path)
+	{
+		//GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, loc, FRotator::ZeroRotator);
+	}
+
+	/*if (!PassageBlock1CubicMeter) return;
+
+	for (int i = 0; i < generatedRooms.size() - 1; i++)
+	{
+		FVector start = generatedRooms[i].GetExitExactLocation(0);
+		FVector end   = generatedRooms[i+1].GetExitExactLocation(0);
+
+		FVector current = start;
+
+		float stepSize = 100.0f; // 1 meter
+		int numOfTries = 0;
+		int numTriesY = 0;
+
+		// Move along X
+		while (FMath::Abs(current.X - end.X) > stepSize && numOfTries < 500)
+		{
+			if (generatedRooms[i + 1].CheckRoomBounds(current.X, current.Y) || generatedRooms[i].CheckRoomBounds(current.X, current.Y))
+			{
+				current.Y += (end.Y > current.Y) ? stepSize : -stepSize;
+				GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, current, FRotator::ZeroRotator);
+				numOfTries++;
+
+				if (numOfTries > 450)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("MANY TRIES!!"));
+				}
+			}
+
+			else
+			{
+				current.X += (end.X > current.X) ? stepSize : -stepSize;
+				GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, current, FRotator::ZeroRotator);
+			}
+			
+		}
+
+		// Move along Y
+		while (FMath::Abs(current.Y - end.Y) > stepSize && numTriesY < 500)
+		{
+			if (generatedRooms[i + 1].CheckRoomBounds(current.X, current.Y))
+			{
+				current.X += (end.X > current.X) ? stepSize : -stepSize;
+				GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, current, FRotator::ZeroRotator);
+				numTriesY++;
+
+				if (numTriesY > 450)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("MANY TRIES Y!"));
+				}
+			}
+
+			else
+			{
+				current.Y += (end.Y > current.Y) ? stepSize : -stepSize;
+				GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, current, FRotator::ZeroRotator);
+			}
+			
+		}
+	}*/
+}
+
+void ALevelGeneration::ReserveRoomSpace(const Room& room)
+{
+	int centerPointX = (room.GetRoomWorldLocation().X / 100.0f) + 75;
+	int centerPointY = (room.GetRoomWorldLocation().Y / 100.0f) + 75;
+
+	FVector center = FVector(centerPointX * 100.0f - 75.0f * 100.0f, centerPointY * 100.0f - 75.0f * 100.0f, 100.0f);
+	GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, center, FRotator::ZeroRotator);
+
+	auto [roomSizeX, roomSizeY] = room.GetRoomSize();
+	//roomSizeX *= 100.0f;
+	//roomSizeY *= 100.0f;
+	// float newRoomSizeX = roomSizeX * 100.0f / DEFAULTROOMSIZE;
+	// float newRoomSizeY = roomSizeY * 100.0f / DEFAULTROOMSIZE;
+	// roomSizeX /= newRoomSizeX;
+	// roomSizeY /= newRoomSizeY;
+
+	for (int i = 0; i < worldSize; i++)
+	{
+		if (i > centerPointY - roomSizeY / 2.0f - 1 && i < centerPointY + roomSizeY / 2.0f + 1)
+		{
+			for (int j = 0; j < worldSize; j++)
+			{
+				if (j > centerPointX - roomSizeX / 2.0f - 1 && j < centerPointX + roomSizeX / 2.0f + 1)
+				{
+					worldOccupancyGrid[i][j] = "Reserved";
+					int xPos = i * 100.0f - 75.0f * 100.0f;
+					int yPos = j * 100.0f - 75.0f * 100.0f;
+					FVector worldPosition = FVector(yPos, xPos, 100.0f);
+
+					
+                    
+				}
+			}
+		}
+	}
+}
+
+std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end)
+{
+	std::vector<FVector> path;
+
+	//reserve entrance
+	worldOccupancyGrid[start.y - 1][start.x] = "exitReserve";
+	UStaticMesh* SphereMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	if (SphereMesh)
+	{
+		AStaticMeshActor* SphereActor = GetWorld()->SpawnActor<AStaticMeshActor>(
+			AStaticMeshActor::StaticClass(), FVector((start.x) * 100.0f - 75.0f * 100.0f, (start.y - 1) * 100.0f - 75.0f * 100.0f, 100.0f),
+			FRotator::ZeroRotator
+		);
+
+		if (SphereActor)
+		{
+			SphereActor->GetStaticMeshComponent()->SetStaticMesh(SphereMesh);
+			SphereActor->SetMobility(EComponentMobility::Movable);
+			SphereActor->SetActorEnableCollision(false);
+
+			SphereActor->SetActorScale3D(FVector(1.2f, 1.2f, 1.2f));
+		}
+	}
+
+	// Directions (up, down, left, right)
+	const int dx[4] = {1, -1, 0, 0};
+	const int dy[4] = {0, 0, 1, -1};
+
+	auto heuristic = [&](int x, int y)
+	{
+		return FMath::Abs(x - end.x) + FMath::Abs(y - end.y);
+	};
+
+	struct Node
+	{
+		int x, y;
+		float g, h;
+		Node* parent;
+	};
+
+	auto cmp = [](Node* a, Node* b)
+	{
+		return (a->g + a->h) > (b->g + b->h);
+	};
+
+	std::priority_queue<Node*, std::vector<Node*>, decltype(cmp)> openSet(cmp);
+	std::vector<std::vector<bool>> closed(worldSize, std::vector<bool>(worldSize, false));
+
+	Node* startNode = new Node{start.x, start.y, 0, (float)heuristic(start.x, start.y), nullptr};
+	openSet.push(startNode);
+
+	Node* endNode = nullptr;
+
+	while (!openSet.empty())
+	{
+		Node* current = openSet.top();
+		openSet.pop();
+
+		if (current->x == end.x && current->y == end.y)
+		{
+			endNode = current;
+			break;
+		}
+
+		if (closed[current->y][current->x])
+			continue;
+
+		closed[current->y][current->x] = true;
+
+		for (int dir = 0; dir < 4; dir++)
+		{
+			int nx = current->x + dx[dir];
+			int ny = current->y + dy[dir];
+
+			// Bounds check
+			if (nx < 0 || nx >= worldSize || ny < 0 || ny >= worldSize)
+				continue;
+
+			// Skip reserved tiles
+			if (worldOccupancyGrid[ny][nx] == "Reserved")
+				continue;
+			if (worldOccupancyGrid[ny][nx] == "ExitBlockReserved")
+			{
+				UE_LOG(LogTemp, Warning, TEXT("BLOCK RESERVE %u   %u"), ny, nx);
+				continue;
+			}
+				
+
+			if (!closed[ny][nx])
+			{
+				Node* neighbor = new Node{nx, ny, current->g + 1, (float)heuristic(nx, ny), current};
+				openSet.push(neighbor);
+			}
+		}
+	}
+
+	// Reconstruct path
+	if (endNode)
+	{
+		Node* current = endNode;
+		while (current != nullptr)
+		{
+			int wx = current->x * 100.0f - 75.0f * 100.0f;
+			int wy = current->y * 100.0f - 75.0f * 100.0f;
+
+			FVector worldPos(wy, wx, 100.0f);
+			path.push_back(worldPos);
+
+			// Mark as "path" in world grid
+			worldOccupancyGrid[current->y][current->x] = "Path";
+
+			FVector fLoc = FVector(wx, wy, 0.f);
+			//GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, fLoc, FRotator::ZeroRotator);
+
+			// Add bordering walls
+			for (int dir = 0; dir < 4; dir++)
+			{
+				int nx = current->x + dx[dir];
+				int ny = current->y + dy[dir];
+
+				if (nx < 0 || nx >= worldSize || ny < 0 || ny >= worldSize)
+					continue;
+
+				if (worldOccupancyGrid[ny][nx] == "walkable")
+				{
+					worldOccupancyGrid[ny][nx] = "Wall";
+
+					int wallWx = nx * 100.0f - 75.0f * 100.0f;
+					int wallWy = ny * 100.0f - 75.0f * 100.0f;
+					FVector wallPos(wallWx, wallWy, 0);
+				}
+			}
+
+			current = current->parent;
+		}
+
+		std::reverse(path.begin(), path.end());
+	}
+
+	return path;
+}
+
+void ALevelGeneration::FillWalls() const
+{
+	if (PassageBlock1CubicMeter2)
+	{
+		for (int y = 0; y < worldSize; y++)
+		{
+			for (int j = 0; j < worldSize; j++)
+			{
+				if (worldOccupancyGrid[y][j] == "Wall")
+				{
+					FVector wallPos = FVector(j * 100.0f - 75.0f * 100.0f, y * 100.0f - 75.0f * 100.0f, 0.f);
+					GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter2, wallPos, FRotator::ZeroRotator);
+				}
+			}
+		}
+	}
+}
+
+void ALevelGeneration::DecorateRooms()
+{
+	for (int y = 0; y < generatedRooms.size(); y++)
+	{
+		FVector roomLoc = generatedRooms[y].GetRoomWorldLocation();
+		auto [roomSizeX, roomSizeY] = generatedRooms[y].GetRoomSize();
+
+		//north wall
+		int numberOfvaultsNorth = roomSizeY / 8.0f;
+
+		for (int x = 0; x < numberOfvaultsNorth; x++)
+		{
+			FVector vaultLoc = FVector(roomLoc.X + roomSizeX * 100.0f / 2.0f,
+			                           roomLoc.Y - roomSizeY * 100.0f / 2.0f + 450.0f + x * 800.0f, 350.0f);
+			AActor* vaultMesh = GetWorld()->SpawnActor<AActor>(BankVaultSystem, vaultLoc, FRotator(0, 0, 270.0f));
+
+			vaultMesh->SetActorScale3D(FVector(2.7f, 2.7f, 2.7f));
+			vaultMesh->SetActorRotation(FRotator(90.0f, 0, 270.0f));
+		}
+
+		//south wall
+		int numberOfvaultsSouth = roomSizeY / 8.0f;
+
+		for (int x = 0; x < numberOfvaultsSouth; x++)
+		{
+			FVector vaultLoc = FVector(roomLoc.X - roomSizeX * 100.0f / 2.0f,
+			                           roomLoc.Y - roomSizeY * 100.0f / 2.0f + 450.0f + x * 800.0f, 350.0f);
+			AActor* vaultMesh = GetWorld()->SpawnActor<AActor>(BankVaultSystem, vaultLoc, FRotator(0, 0, 270.0f));
+
+			vaultMesh->SetActorScale3D(FVector(2.7f, 2.7f, 2.7f));
+			vaultMesh->SetActorRotation(FRotator(90.0f, 180.0f, 270.0f));
+		}
+	}
+}
+
+void ALevelGeneration::MakeExits()
+{
+	for (int y = 0; y < generatedRooms.size(); y++)
+	{
+		//exit reserves for blocks
+		Cell ExitBlockArea = WorldToGrid(generatedRooms[y].GetExitExactLocation(0));
+		ExitBlockArea.x += 2;
+		ExitBlockArea.y -= 1;
+
+		worldOccupancyGrid[ExitBlockArea.y][ExitBlockArea.x] = "ExitBlockReserved";
+		FVector blockLoc(ExitBlockArea.x * 100.0f - 75.0f * 100.0f, ExitBlockArea.y * 100.0f - 75.0f * 100.0f, 100.0f);
+		GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, blockLoc, FRotator::ZeroRotator);
+
+		ExitBlockArea.x -= 4;
+		worldOccupancyGrid[ExitBlockArea.y][ExitBlockArea.x] = "ExitBlockReserved";
+		FVector blockLoc2(ExitBlockArea.x * 100.0f - 75.0f * 100.0f, ExitBlockArea.y * 100.0f - 75.0f * 100.0f, 100.0f);
+		GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, blockLoc2, FRotator::ZeroRotator);
+	}
+	
+}
+
+
+Cell ALevelGeneration::WorldToGrid(const FVector& worldLocation) const
+{
+	int xGridPoint = worldLocation.X / 100.0f + 75;
+	int yGridPoint = worldLocation.Y / 100.0f + 75;
+
+	Cell gridPointCell;
+	gridPointCell.x = xGridPoint;
+	gridPointCell.y = yGridPoint;
+
+	return gridPointCell;
 }
