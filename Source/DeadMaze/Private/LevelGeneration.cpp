@@ -574,72 +574,14 @@ void ALevelGeneration::CreatePassages()
 		}
 	}
 
-	auto path = FindCorridorPath(startCell, goalCell);
+	auto path = FindCorridorPath(startCell, goalCell, 0, 0);
 
 	for (auto& loc : path)
 	{
 		//GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, loc, FRotator::ZeroRotator);
 	}
 
-	/*if (!PassageBlock1CubicMeter) return;
-
-	for (int i = 0; i < generatedRooms.size() - 1; i++)
-	{
-		FVector start = generatedRooms[i].GetExitExactLocation(0);
-		FVector end   = generatedRooms[i+1].GetExitExactLocation(0);
-
-		FVector current = start;
-
-		float stepSize = 100.0f; // 1 meter
-		int numOfTries = 0;
-		int numTriesY = 0;
-
-		// Move along X
-		while (FMath::Abs(current.X - end.X) > stepSize && numOfTries < 500)
-		{
-			if (generatedRooms[i + 1].CheckRoomBounds(current.X, current.Y) || generatedRooms[i].CheckRoomBounds(current.X, current.Y))
-			{
-				current.Y += (end.Y > current.Y) ? stepSize : -stepSize;
-				GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, current, FRotator::ZeroRotator);
-				numOfTries++;
-
-				if (numOfTries > 450)
-				{
-					UE_LOG(LogTemp, Warning, TEXT("MANY TRIES!!"));
-				}
-			}
-
-			else
-			{
-				current.X += (end.X > current.X) ? stepSize : -stepSize;
-				GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, current, FRotator::ZeroRotator);
-			}
-			
-		}
-
-		// Move along Y
-		while (FMath::Abs(current.Y - end.Y) > stepSize && numTriesY < 500)
-		{
-			if (generatedRooms[i + 1].CheckRoomBounds(current.X, current.Y))
-			{
-				current.X += (end.X > current.X) ? stepSize : -stepSize;
-				GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, current, FRotator::ZeroRotator);
-				numTriesY++;
-
-				if (numTriesY > 450)
-				{
-					UE_LOG(LogTemp, Warning, TEXT("MANY TRIES Y!"));
-				}
-			}
-
-			else
-			{
-				current.Y += (end.Y > current.Y) ? stepSize : -stepSize;
-				GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, current, FRotator::ZeroRotator);
-			}
-			
-		}
-	}*/
+	
 }
 
 void ALevelGeneration::ReserveRoomSpace(const Room& room)
@@ -671,20 +613,29 @@ void ALevelGeneration::ReserveRoomSpace(const Room& room)
 					int yPos = j * 100.0f - 75.0f * 100.0f;
 					FVector worldPosition = FVector(yPos, xPos, 100.0f);
 
-					
-                    
 				}
 			}
 		}
 	}
 }
 
-std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end)
+std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end, int exitIndexStart, int exitIndexEnd)
 {
 	std::vector<FVector> path;
 
 	//reserve entrance
+	//start
 	worldOccupancyGrid[start.y - 1][start.x] = "exitReserve";
+	worldOccupancyGrid[start.y - 1][start.x + 2] = "exitReserve";
+
+	//end
+	worldOccupancyGrid[end.y - 1][end.x + 2] = "exitReserve";
+	worldOccupancyGrid[end.y - 1][end.x + 1] = "exitReserve";
+	worldOccupancyGrid[end.y - 1][end.x + 0] = "exitReserve";
+	worldOccupancyGrid[end.y - 1][end.x + 1] = "exitReserve";
+	worldOccupancyGrid[end.y - 1][end.x + 2] = "exitReserve";
+
+
 	UStaticMesh* SphereMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (SphereMesh)
 	{
@@ -758,6 +709,17 @@ std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end)
 				continue;
 
 			// Skip reserved tiles
+
+			Cell ExitBlockArea = WorldToGrid(generatedRooms[0].GetExitExactLocation(0));
+			ExitBlockArea.x += 2;
+			ExitBlockArea.y -= 1;
+
+			if ((ny == 74 && nx == 95) || (ny == 95 && nx == 74))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("BLOCK RESERVE2 %u   %u"), ny, nx);
+				continue;
+			}
+			
 			if (worldOccupancyGrid[ny][nx] == "Reserved")
 				continue;
 			if (worldOccupancyGrid[ny][nx] == "ExitBlockReserved")
@@ -765,6 +727,8 @@ std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end)
 				UE_LOG(LogTemp, Warning, TEXT("BLOCK RESERVE %u   %u"), ny, nx);
 				continue;
 			}
+
+			
 				
 
 			if (!closed[ny][nx])
@@ -878,12 +842,38 @@ void ALevelGeneration::MakeExits()
 {
 	for (int y = 0; y < generatedRooms.size(); y++)
 	{
-		//exit reserves for blocks
+		/*if (y == 0)
+		{
+			//exit reserves for blocks
+			Cell ExitBlockArea = WorldToGrid(generatedRooms[y].GetExitExactLocation(0));
+			ExitBlockArea.x += 2;
+			ExitBlockArea.y -= 1;
+
+			UE_LOG(LogTemp, Warning, TEXT("Exit Block %u   %u"), ExitBlockArea.y, ExitBlockArea.x);
+
+			worldOccupancyGrid[ExitBlockArea.y][ExitBlockArea.x] = "ExitBlockReserved";
+			worldOccupancyGrid[ExitBlockArea.y + 1][ExitBlockArea.x] = "ExitBlockReserved";
+			
+			FVector blockLoc(ExitBlockArea.x * 100.0f - 75.0f * 100.0f, ExitBlockArea.y * 100.0f - 75.0f * 100.0f, 100.0f);
+			GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, blockLoc, FRotator::ZeroRotator);
+
+			ExitBlockArea.x -= 4;
+			UE_LOG(LogTemp, Warning, TEXT("Exit Block %u   %u"), ExitBlockArea.y, ExitBlockArea.x);
+		
+			worldOccupancyGrid[ExitBlockArea.y][ExitBlockArea.x] = "ExitBlockReserved";
+			worldOccupancyGrid[ExitBlockArea.y + 1][ExitBlockArea.x] = "ExitBlockReserved";
+			
+			FVector blockLoc2(ExitBlockArea.x * 100.0f - 75.0f * 100.0f, ExitBlockArea.y * 100.0f - 75.0f * 100.0f, 100.0f);
+			GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, blockLoc2, FRotator::ZeroRotator);
+
+			
+		}*/
+
 		Cell ExitBlockArea = WorldToGrid(generatedRooms[y].GetExitExactLocation(0));
 		ExitBlockArea.x += 2;
 		ExitBlockArea.y -= 1;
-
 		worldOccupancyGrid[ExitBlockArea.y][ExitBlockArea.x] = "ExitBlockReserved";
+
 		FVector blockLoc(ExitBlockArea.x * 100.0f - 75.0f * 100.0f, ExitBlockArea.y * 100.0f - 75.0f * 100.0f, 100.0f);
 		GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, blockLoc, FRotator::ZeroRotator);
 

@@ -224,7 +224,7 @@ private:
     void CreatePassages();
     void ReserveRoomSpace(const Room& room);
     Cell WorldToGrid(const FVector& worldLocation) const;
-    std::vector<FVector> FindCorridorPath(Cell start, Cell end);
+    std::vector<FVector> FindCorridorPath(Cell start, Cell end, int exitIndexStart, int exitIndexEnd);
     void FillWalls() const;
     void DecorateRooms();
     void MakeExits();
