@@ -37,8 +37,8 @@ public:
         {
             exits.reserve(2);
             
-            exits.emplace_back(0, roomSizeY / 2.0f);
-            exits.emplace_back(roomSizeX - 1, roomSizeY / 2.0f);
+            exits.emplace_back(-roomSizeX / 2.0f, 0);
+            exits.emplace_back(-roomSizeX / 2.0f, 0);
 
             m_roomType = roomType;
         }
@@ -47,7 +47,7 @@ public:
         {
             exits.reserve(1);
             
-            exits.emplace_back(0, roomSizeY / 2.0f);
+            exits.emplace_back(-roomSizeX / 2.0f, 0);
 
             m_roomType = roomType;
         }
@@ -58,7 +58,7 @@ public:
             
             exits.emplace_back(0, roomSizeY / 2.0f);
             exits.emplace_back(roomSizeX - 1, roomSizeY / 2.0f);
-            exits.emplace_back(roomSizeX / 2.0f, roomSizeY - 1);
+            exits.emplace_back(roomSizeX / 2.0f, 0);
 
             m_roomType = roomType;
         }
@@ -69,7 +69,7 @@ public:
             
             exits.emplace_back(0, roomSizeY / 2.0f);
             exits.emplace_back(roomSizeX - 1, roomSizeY / 2.);
-            exits.emplace_back(roomSizeX / 2.0f, roomSizeY - 1);
+            exits.emplace_back(roomSizeX / 2.0f, 0);
             exits.emplace_back(roomSizeX / 2.0f, 0);
 
             m_roomType = roomType;
@@ -94,7 +94,12 @@ public:
 
             if (exitIndex == 0)
             {
-                return exitLocation + FVector(0, 200.0f, 0);
+                return exitLocation + FVector(-200.0f, 0, 0);
+            }
+
+            else if (exitIndex == 2)
+            {
+                return exitLocation + FVector(200.0f, 0, 0);
             }
 
             else
@@ -226,7 +231,7 @@ private:
     Cell WorldToGrid(const FVector& worldLocation) const;
     std::vector<FVector> FindCorridorPath(Cell start, Cell end, int exitIndexStart, int exitIndexEnd);
     void FillWalls() const;
-    void DecorateRooms();
+    void DecorateRooms() const;
     void MakeExits();
 
     const int MAZESIZE = 34;
