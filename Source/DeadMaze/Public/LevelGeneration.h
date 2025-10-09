@@ -38,7 +38,7 @@ public:
             exits.reserve(2);
             
             exits.emplace_back(-roomSizeX / 2.0f, 0);
-            exits.emplace_back(-roomSizeX / 2.0f, 0);
+            exits.emplace_back(0,  roomSizeY / 2.0f);
 
             m_roomType = roomType;
         }
@@ -95,6 +95,11 @@ public:
             if (exitIndex == 0)
             {
                 return exitLocation + FVector(-200.0f, 0, 0);
+            }
+
+            if (exitIndex == 1)
+            {
+                return exitLocation + FVector(0, 200.0f, 0);
             }
 
             else if (exitIndex == 2)
@@ -234,8 +239,8 @@ private:
     void DecorateRooms() const;
     void MakeExits();
 
-    const int MAZESIZE = 34;
-    FString MazeGrid[34][34];
+    const int MAZESIZE = 30;
+    FString MazeGrid[30][30];
 
     std::vector<Room> generatedRooms;
     const int worldSize = 150;

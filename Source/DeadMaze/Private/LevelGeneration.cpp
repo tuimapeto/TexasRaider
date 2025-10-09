@@ -234,7 +234,7 @@ void ALevelGeneration::GenerateGrid()
 					float keyPosX = i * 1.0f;
 					float keyPosZ = j * 1.0f;
 					float TileSize = 100.0f; // 1 meter per tile
-					FVector SpawnLocation = FVector(j * TileSize - 2000.0f, i * TileSize - 1400.0f, 50.0f);
+					FVector SpawnLocation = FVector(j * TileSize - 1700.0f, i * TileSize - 1300.0f, 50.0f);
 					// Z is up in Unreal
 					GetWorld()->SpawnActor<AActor>(WallClass, SpawnLocation, FRotator::ZeroRotator);
 
@@ -261,7 +261,7 @@ void ALevelGeneration::GenerateGrid()
 					float keyPosX = i * 1.0f;
 					float keyPosZ = j * 1.0f;
 					float TileSize = 100.0f; // 1 meter per tile
-					FVector SpawnLocation = FVector(j * TileSize - 2000.0f, i * TileSize - 1400.0f, 100.0f);
+					FVector SpawnLocation = FVector(j * TileSize - 1700.0f, i * TileSize - 1300.0f, 100.0f);
 					// Z is up in Unreal
 					GetWorld()->SpawnActor<AActor>(KeyClass, SpawnLocation, FRotator::ZeroRotator);
 
@@ -291,7 +291,7 @@ void ALevelGeneration::GenerateGrid()
 				numPlacedVases++;
 
 				float TileSize = 100.0f; // 1 meter per tile
-				FVector SpawnLocation = FVector(yCoordinate * TileSize - 2000.0f, xCoordinate * TileSize - 1400.0f,
+				FVector SpawnLocation = FVector(yCoordinate * TileSize - 1700.0f, xCoordinate * TileSize - 1300.0f,
 				                                100.0f); // Z is up in Unreal
 				GetWorld()->SpawnActor<AActor>(TreasureClass, SpawnLocation, FRotator::ZeroRotator);
 
@@ -390,6 +390,8 @@ bool ALevelGeneration::CheckRoomOverlap(const Room& extraRoom) const
 		bool yOverlapping = false;
 		bool xOverlapping = false;
 
+		const float Padding = 500.0f; // Add 500 cm (5 m) buffer around each room
+
 		//get locations and room sizes
 		FVector generatedRoomLocation = generatedRooms[j].GetRoomWorldLocation();
 		FVector extraRoomLocation = extraRoom.GetRoomWorldLocation();
@@ -402,6 +404,12 @@ bool ALevelGeneration::CheckRoomOverlap(const Room& extraRoom) const
 		extraRoomSizeY *= 100.0f;
 		generatedRoomSizeX *= 100.0f;
 		generatedRoomSizeY *= 100.0f;
+
+		// Add padding to each half-size
+		extraRoomSizeX += Padding * 2.0f;
+		extraRoomSizeY += Padding * 2.0f;
+		generatedRoomSizeX += Padding * 2.0f;
+		generatedRoomSizeY += Padding * 2.0f;
 
 		//check overlapping for y and x axes
 
@@ -423,6 +431,8 @@ bool ALevelGeneration::CheckRoomOverlap(const Room& extraRoom) const
 		{
 			yOverlapping = false;
 			xOverlapping = false;
+
+			UE_LOG(LogTemp, Warning, TEXT("Both overlap!"));
 			return true;
 		}
 	}
@@ -487,6 +497,7 @@ void ALevelGeneration::CreateRooms()
 	for (int i = 0; i < numExtraRooms; i++)
 	{
 	redoPoint:
+		UE_LOG(LogTemp, Warning, TEXT("At redo point!"));
 		int roomSizeX = rand() % 20 + 20;
 		int roomSizeY = rand() % 20 + 20;
 
@@ -568,26 +579,55 @@ void ALevelGeneration::CreatePassages()
 {
 	if (generatedRooms.size() == 2)
 	{
+	
 		Cell startCell = WorldToGrid(generatedRooms[0].GetExitExactLocation(2));
-		Cell goalCell = WorldToGrid(generatedRooms[1].GetExitExactLocation(0));
+		Cell goalCell;
+		int exitIndexEnd = 0;
 
+		if (generatedRooms[1].m_roomType == RoomType::OneExit)
+		{
+			goalCell = WorldToGrid(generatedRooms[1].GetExitExactLocation(0));
+			exitIndexEnd = 0;
+
+		}
+
+		else
+		{
+			goalCell = WorldToGrid(generatedRooms[1].GetExitExactLocation(1));
+			exitIndexEnd = 1;
+		}
+		
 		FVector vaultLoc = FVector(goalCell.x * 100.0f - 75.0f * 100.0f, goalCell.y * 100.0f - 75.0f * 100.0f, 100.0f);
 									
 		AActor* vaultMesh = GetWorld()->SpawnActor<AActor>(BankVaultSystem, vaultLoc, FRotator(0, 0, 270.0f));
 
-		auto path = FindCorridorPath(startCell, goalCell, 2, 0);
+		auto path = FindCorridorPath(startCell, goalCell, 2, exitIndexEnd);
 	}
 
 	if (generatedRooms.size() == 3)
 	{
 		Cell startCell = WorldToGrid(generatedRooms[0].GetExitExactLocation(2));
-		Cell goalCell = WorldToGrid(generatedRooms[1].GetExitExactLocation(0));
+		Cell goalCell;
+		int exitIndexEnd = 0;
 
+		if (generatedRooms[1].m_roomType == RoomType::OneExit)
+		{
+			goalCell = WorldToGrid(generatedRooms[1].GetExitExactLocation(0));
+			exitIndexEnd = 0;
+
+		}
+
+		else
+		{
+			goalCell = WorldToGrid(generatedRooms[1].GetExitExactLocation(1));
+			exitIndexEnd = 1;
+		}
+		
 		FVector vaultLoc = FVector(goalCell.x * 100.0f - 75.0f * 100.0f, goalCell.y * 100.0f - 75.0f * 100.0f, 100.0f);
 									
 		AActor* vaultMesh = GetWorld()->SpawnActor<AActor>(BankVaultSystem, vaultLoc, FRotator(0, 0, 270.0f));
 
-		auto path = FindCorridorPath(startCell, goalCell, 2, 0);
+		auto path = FindCorridorPath(startCell, goalCell, 2, exitIndexEnd);
 	}
 	
 }
@@ -656,6 +696,23 @@ std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end, in
 	// worldOccupancyGrid[end.y - 1][end.x + 0] = "exitReserve";
 	// worldOccupancyGrid[end.y - 1][end.x + 1] = "exitReserve";
 	// worldOccupancyGrid[end.y - 1][end.x + 2] = "exitReserve";
+
+	if (exitIndexStart == 2)
+	{
+		worldOccupancyGrid[start.y][start.x - 1] = "exitReserve";
+	}
+	
+	if (exitIndexEnd == 0)
+	{
+		worldOccupancyGrid[end.y][end.x + 1] = "exitReserve";
+
+		FVector wallPos = FVector((end.x + 1) * 100.0f - 75.0f * 100.0f, (end.y - 1) * 100.0f - 75.0f * 100.0f, 0.f);
+		GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter2, wallPos, FRotator::ZeroRotator);
+
+		wallPos = FVector((end.x + 1) * 100.0f - 75.0f * 100.0f, (end.y + 1) * 100.0f - 75.0f * 100.0f, 0.f);
+		GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter2, wallPos, FRotator::ZeroRotator);
+		
+	}
 	
 	// Directions (up, down, left, right)
 	const int dx[4] = {1, -1, 0, 0};
