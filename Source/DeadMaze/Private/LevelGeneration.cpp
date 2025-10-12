@@ -837,6 +837,11 @@ std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end, in
 		std::reverse(path.begin(), path.end());
 	}
 
+	for (int i = 0; i < openSet.size(); i++)
+	{
+		delete openSet.top();
+	}
+		
 	return path;
 }
 
@@ -850,7 +855,7 @@ void ALevelGeneration::FillWalls() const
 			{
 				if (worldOccupancyGrid[y][j] == "Wall")
 				{
-					FVector wallPos = FVector(j * 100.0f - 75.0f * 100.0f, y * 100.0f - 75.0f * 100.0f, 0.f);
+					FVector wallPos = FVector(j * 100.0f - 75.0f * 100.0f, y * 100.0f - 75.0f * 100.0f, 150.f);
 					GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter2, wallPos, FRotator::ZeroRotator);
 				}
 			}
