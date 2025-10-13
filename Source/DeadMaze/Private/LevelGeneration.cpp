@@ -533,6 +533,12 @@ void ALevelGeneration::CreateRooms()
 			goto redoPoint;
 		}
 
+		//make the first extra room to be south from first exit
+		if (generatedRooms.size() == 1 && extraRoomWorldLocationX < 3400.0f)
+		{
+			goto redoPoint;
+		}
+
 		AActor* extraRoomRef = nullptr;
 
 		switch (roomTypeIndex)
@@ -697,7 +703,7 @@ std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end, in
 	// worldOccupancyGrid[end.y - 1][end.x + 1] = "exitReserve";
 	// worldOccupancyGrid[end.y - 1][end.x + 2] = "exitReserve";
 
-	if (exitIndexStart == 2)
+	/*if (exitIndexStart == 2)
 	{
 		worldOccupancyGrid[start.y][start.x - 1] = "exitReserve";
 	}
@@ -712,7 +718,7 @@ std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end, in
 		wallPos = FVector((end.x + 1) * 100.0f - 75.0f * 100.0f, (end.y + 1) * 100.0f - 75.0f * 100.0f, 0.f);
 		GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter2, wallPos, FRotator::ZeroRotator);
 		
-	}
+	}*/
 	
 	// Directions (up, down, left, right)
 	const int dx[4] = {1, -1, 0, 0};
@@ -727,25 +733,25 @@ std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end, in
 	{
 		int x, y;
 		float g, h;
-		Node* parent;
+		std::shared_ptr<Node> parent;
 	};
 
-	auto cmp = [](Node* a, Node* b)
+	auto cmp = [](std::shared_ptr<Node> a, std::shared_ptr<Node> b)
 	{
 		return (a->g + a->h) > (b->g + b->h);
 	};
 
-	std::priority_queue<Node*, std::vector<Node*>, decltype(cmp)> openSet(cmp);
+	std::priority_queue<std::shared_ptr<Node>, std::vector<std::shared_ptr<Node>>, decltype(cmp)> openSet(cmp);
 	std::vector<std::vector<bool>> closed(worldSize, std::vector<bool>(worldSize, false));
 
-	Node* startNode = new Node{start.x, start.y, 0, (float)heuristic(start.x, start.y), nullptr};
+	std::shared_ptr<Node> startNode = std::make_shared<Node>(start.x, start.y, 0, (float)heuristic(start.x, start.y), nullptr);
 	openSet.push(startNode);
 
-	Node* endNode = nullptr;
+	std::shared_ptr<Node> endNode = nullptr;
 
 	while (!openSet.empty())
 	{
-		Node* current = openSet.top();
+		std::shared_ptr<Node> current = openSet.top();
 		openSet.pop();
 
 		if (current->x == end.x && current->y == end.y)
@@ -788,23 +794,23 @@ std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end, in
 
 			if (!closed[ny][nx])
 			{
-				Node* neighbor = new Node{nx, ny, current->g + 1, (float)heuristic(nx, ny), current};
+				std::shared_ptr<Node> neighbor = std::make_shared<Node>(nx, ny, current->g + 1, (float)heuristic(nx, ny), current);
 				openSet.push(neighbor);
 			}
 		}
 	}
 
 	// Reconstruct path
-	if (endNode)
+	/*if (endNode)
 	{
-		Node* current = endNode;
+		std::shared_ptr<Node> current = endNode;
 		while (current != nullptr)
 		{
 			int wx = current->x * 100.0f - 75.0f * 100.0f;
 			int wy = current->y * 100.0f - 75.0f * 100.0f;
 
 			FVector worldPos(wy, wx, 100.0f);
-			path.push_back(worldPos);
+			path.emplace_back(worldPos);
 
 			// Mark as "path" in world grid
 			worldOccupancyGrid[current->y][current->x] = "Path";
@@ -824,10 +830,6 @@ std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end, in
 				if (worldOccupancyGrid[ny][nx] == "walkable")
 				{
 					worldOccupancyGrid[ny][nx] = "Wall";
-
-					int wallWx = nx * 100.0f - 75.0f * 100.0f;
-					int wallWy = ny * 100.0f - 75.0f * 100.0f;
-					FVector wallPos(wallWx, wallWy, 0);
 				}
 			}
 
@@ -835,12 +837,75 @@ std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end, in
 		}
 
 		std::reverse(path.begin(), path.end());
+	}*/
+
+	// Reconstruct path
+	if (endNode)
+	{
+		std::shared_ptr<Node> current = endNode;
+		while (current != nullptr)
+		{
+			int baseX = current->x;
+			int baseY = current->y;
+
+			// Expand corridor radius: 1 tile around path tile (3x3 square)
+			// Add walls just beyond the expanded path
+			for (int offsetY = -2; offsetY <= 2; offsetY++)
+			{
+				for (int offsetX = -2; offsetX <= 2; offsetX++)
+				{
+					int nx = baseX + offsetX;
+					int ny = baseY + offsetY;
+
+					if (nx < 0 || nx >= worldSize || ny < 0 || ny >= worldSize)
+						continue;
+
+					if (worldOccupancyGrid[ny][nx] == "walkable")
+					{
+						worldOccupancyGrid[ny][nx] = "Wall";
+
+						int wx = nx * 100.0f - 75.0f * 100.0f;
+						int wy = ny * 100.0f - 75.0f * 100.0f;
+						FVector wallPos(wx, wy, 0.f);
+
+						//GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter2, wallPos, FRotator::ZeroRotator);
+					}
+				}
+			}
+			
+			for (int offsetY = -1; offsetY <= 1; offsetY++)
+			{
+				for (int offsetX = -1; offsetX <= 1; offsetX++)
+				{
+					int nx = baseX + offsetX;
+					int ny = baseY + offsetY;
+
+					// Skip out-of-bounds
+					if (nx < 0 || nx >= worldSize || ny < 0 || ny >= worldSize)
+						continue;
+
+					// Only fill walkable or empty cells
+					if (worldOccupancyGrid[ny][nx] == "walkable" || worldOccupancyGrid[ny][nx] == "Wall")
+					{
+						worldOccupancyGrid[ny][nx] = "Path";
+
+						int wx = nx * 100.0f - 75.0f * 100.0f;
+						int wy = ny * 100.0f - 75.0f * 100.0f;
+						FVector fLoc(wx, wy, 0.f);
+
+						//GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, fLoc, FRotator::ZeroRotator);
+					}
+				}
+			}
+
+			
+
+			current = current->parent;
+		}
+
+		std::reverse(path.begin(), path.end());
 	}
 
-	for (int i = 0; i < openSet.size(); i++)
-	{
-		delete openSet.top();
-	}
 		
 	return path;
 }
@@ -858,6 +923,18 @@ void ALevelGeneration::FillWalls() const
 					FVector wallPos = FVector(j * 100.0f - 75.0f * 100.0f, y * 100.0f - 75.0f * 100.0f, 150.f);
 					GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter2, wallPos, FRotator::ZeroRotator);
 				}
+			}
+		}
+	}
+
+	for (int y = 0; y < worldSize; y++)
+	{
+		for (int j = 0; j < worldSize; j++)
+		{
+			if (worldOccupancyGrid[y][j] == "Path")
+			{
+				FVector wallPos = FVector(j * 100.0f - 75.0f * 100.0f, y * 100.0f - 75.0f * 100.0f, 150.f);
+				GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter, wallPos, FRotator::ZeroRotator);
 			}
 		}
 	}
