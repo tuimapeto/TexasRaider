@@ -202,6 +202,9 @@ protected:
     TSubclassOf<AActor> TreasureClass;
 
     UPROPERTY(EditAnywhere, Category = "Level Generation")
+    TSubclassOf<AActor> PlantClass; 
+    
+    UPROPERTY(EditAnywhere, Category = "Level Generation")
     TSubclassOf<AActor> RoomThreeExit;
 
     UPROPERTY(EditAnywhere, Category = "Level Generation")

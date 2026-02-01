@@ -307,6 +307,33 @@ void ALevelGeneration::GenerateGrid()
 		//GetWorld()->SpawnActor<AActor>(KeyClass, FVector(400, 200.0f, 200.0f), FRotator::ZeroRotator);
 	}
 
+	if (PlantClass)
+	{
+		int numPlantPlacingAttempts = 0;
+		int maxPlantPlacingAttempts = 50;
+		int numPlacedPlants = 0;
+
+		while (numPlantPlacingAttempts < maxPlantPlacingAttempts && numPlacedPlants < 4)
+		{
+			int xCoordinate = rand() % MAZESIZE;
+			int yCoordinate = rand() % MAZESIZE;
+
+			if (MazeGrid[xCoordinate][yCoordinate] == "Empty")
+			{
+				numPlacedPlants++;
+
+				float TileSize = 100.0f; // 1 meter per tile
+				FVector SpawnLocation = FVector(yCoordinate * TileSize - 1700.0f, xCoordinate * TileSize - 1300.0f,
+												30.0f); // Z is up in Unreal
+				GetWorld()->SpawnActor<AActor>(PlantClass, SpawnLocation, FRotator::ZeroRotator);
+
+				//UE_LOG(LogTemp, Warning, TEXT("Spawning treasure at (%d, %d)"), i, j);
+			}
+
+			numPlantPlacingAttempts++;
+		}
+	}
+
 	//if (PlayerBeginPos)
 	//{
 	//	FActorSpawnParameters SpawnParams;
