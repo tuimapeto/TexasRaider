@@ -4,7 +4,7 @@
 
 ALevelGeneration::ALevelGeneration()
 {
-	PrimaryActorTick.bCanEverTick = false; // No need to tick unless you want live updates
+	/*PrimaryActorTick.bCanEverTick = false; // No need to tick unless you want live updates
 	UE_LOG(LogTemp, Warning, TEXT("BeginPlay called"));
 
 	//fill world grid
@@ -14,19 +14,19 @@ ALevelGeneration::ALevelGeneration()
 		{
 			worldOccupancyGrid[i][j] = "walkable";
 		}
-	}
+	}*/
 }
 
 void ALevelGeneration::BeginPlay()
 {
 	Super::BeginPlay();
 
-	GenerateGrid();
+	/*GenerateGrid();
 	CreateRooms();
 	//MakeExits();
 	CreatePassages();
 	FillWalls();
-	DecorateRooms();
+	DecorateRooms();*/
 }
 
 void ALevelGeneration::Tick(float DeltaTime)
@@ -34,7 +34,7 @@ void ALevelGeneration::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
-void ALevelGeneration::GenerateGrid()
+/*void ALevelGeneration::GenerateGrid()
 {
 	srand(time(NULL));
 	UE_LOG(LogTemp, Warning, TEXT("Spawning key"));
@@ -52,7 +52,7 @@ void ALevelGeneration::GenerateGrid()
 	/*Cell entrance = { 0, rand() % MAZESIZE };
 	Cell exit = { MAZESIZE - 1, rand() % MAZESIZE };
 	MazeGrid[entrance.y][entrance.x] = "Entrance";
-	MazeGrid[exit.y][exit.x] = "Exit";*/
+	MazeGrid[exit.y][exit.x] = "Exit";#1#
 
 	Cell entrance = {0, 20};
 	Cell exit = {MAZESIZE - 1, 0};
@@ -96,7 +96,7 @@ void ALevelGeneration::GenerateGrid()
 			SphereActor->SetMobility(EComponentMobility::Movable);
 			SphereActor->SetActorEnableCollision(false);
 		}
-	}*/
+	}#1#
 
 
 	// Step 4: Place keys randomly and carve paths to them
@@ -360,7 +360,7 @@ void ALevelGeneration::GenerateGrid()
 
 	  ACharacter* newCharacter = GetWorld()->SpawnActor<ACharacter>(
 		DefaultPawnClass, CustomSpawnLocation, CustomSpawnRotation, SpawnParams
-	);*/
+	);#1#
 
 	// Pick a location and rotation for spawning
 }
@@ -721,7 +721,7 @@ std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end, in
 		worldOccupancyGrid[start.y - 1][start.x - 1] = "exitReserve";
 		worldOccupancyGrid[start.y + 1][start.x - 1] = "exitReserve";
 		worldOccupancyGrid[start.y][start.x - 1] = "exitReserve";
-	}*/
+	}#1#
 
 	//end
 	// worldOccupancyGrid[end.y - 1][end.x + 2] = "exitReserve";
@@ -745,7 +745,7 @@ std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end, in
 		wallPos = FVector((end.x + 1) * 100.0f - 75.0f * 100.0f, (end.y + 1) * 100.0f - 75.0f * 100.0f, 0.f);
 		GetWorld()->SpawnActor<AActor>(PassageBlock1CubicMeter2, wallPos, FRotator::ZeroRotator);
 		
-	}*/
+	}#1#
 	
 	// Directions (up, down, left, right)
 	const int dx[4] = {1, -1, 0, 0};
@@ -864,7 +864,7 @@ std::vector<FVector> ALevelGeneration::FindCorridorPath(Cell start, Cell end, in
 		}
 
 		std::reverse(path.begin(), path.end());
-	}*/
+	}#1#
 
 	// Reconstruct path
 	if (endNode)
@@ -1055,4 +1055,4 @@ Cell ALevelGeneration::WorldToGrid(const FVector& worldLocation) const
 	gridPointCell.y = yGridPoint;
 
 	return gridPointCell;
-}
+}*/

@@ -8,7 +8,7 @@
 #include <random>
 #include "LevelGeneration.generated.h"
 
-struct Cell
+/*struct Cell
 {
     int x, y;
 };
@@ -121,7 +121,7 @@ public:
             exitLocation.Z = 0;
         
             return exitLocation;
-        }*/
+        }#1#
 
         else
         {
@@ -178,7 +178,7 @@ private:
 
     float m_roomSizeX;
     float m_roomSizeY;
-};
+};*/
 
 UCLASS()
 class DEADMAZE_API ALevelGeneration : public AActor
@@ -229,7 +229,7 @@ public:
     virtual void Tick(float DeltaTime) override;
 
 private:
-    void GenerateGrid();
+    /*void GenerateGrid();
     bool IsCellReachableAfterWall(int wx, int wy, Cell entrance, Cell exit);
     bool CheckRoomOverlap(const Room& extraRoom) const;
 
@@ -251,5 +251,5 @@ private:
 
     //constants
     const float WORLDLOCATIONOFFSET = 15000.0f;
-    const float DEFAULTROOMSIZE = 2000.0f;
+    const float DEFAULTROOMSIZE = 2000.0f;*/
 };
