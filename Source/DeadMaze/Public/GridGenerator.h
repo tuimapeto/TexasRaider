@@ -63,8 +63,8 @@ public:
 	bool IsCellReachableAfterWall(int wx, int wy, Cell entrance, Cell exit);
 	
 private:
-	const int MAZESIZE = 20;
-	FString MazeGrid[20][20];
+	const int MAZESIZE = 18;
+	FString MazeGrid[18][18];
     
     void PlaceActorsInGrid(const FVector& gridOffset, const FString& objectClass, UClass* placedActor, float zOffset) const;
 	bool HasNearbyWall(int x, int y, int radius) const;

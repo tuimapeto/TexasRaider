@@ -40,8 +40,8 @@ void AGridGenerator::GenerateGrid(FVector gridOffset)
 
 	// Step 2: Place entrance & exit
 
-	Cell entrance = {9, 19};
-	Cell exit = {9, 0};
+	Cell entrance = {7, 17};
+	Cell exit = {7, 0};
 	MazeGrid[entrance.y][entrance.x] = "Entrance";
 	MazeGrid[exit.y][exit.x] = "Exit";
 
@@ -67,11 +67,16 @@ void AGridGenerator::GenerateGrid(FVector gridOffset)
 	}
 	
 	// Step 4: Place keys randomly and carve paths to them
+	// Step 4: Place keys randomly and carve paths to them
 	int keysPlaced = 0;
 	int maxAttempts = 1000; // Prevent infinite loops
 	int attempts = 0;
 
-	while (keysPlaced < 10 && attempts < maxAttempts)
+	const int MinKeyDistance = 6;
+
+	TArray<Cell> PlacedKeys;
+
+	while (keysPlaced < 8 && attempts < maxAttempts)
 	{
 		attempts++;
 
@@ -81,17 +86,32 @@ void AGridGenerator::GenerateGrid(FVector gridOffset)
 		// Skip if cell is not empty
 		if (MazeGrid[keyY][keyX] != "Empty") continue;
 
+		// Ensure minimum distance from other keys
+		bool tooClose = false;
+		for (const Cell& existingKey : PlacedKeys)
+		{
+			int dist = abs(existingKey.x - keyX) + abs(existingKey.y - keyY); // Manhattan distance
+			if (dist < MinKeyDistance)
+			{
+				tooClose = true;
+				break;
+			}
+		}
+
+		if (tooClose) continue;
+
 		// Find nearest path cell to carve from
 		std::queue<Cell> q;
-		bool visited[50][50] = {false};
-		q.push({keyX, keyY});
+		bool visited[50][50] = { false };
+
+		q.push({ keyX, keyY });
 		visited[keyY][keyX] = true;
 
-		Cell nearestPath = {-1, -1};
+		Cell nearestPath = { -1, -1 };
 		bool found = false;
 
-		int dx[4] = {1, -1, 0, 0};
-		int dy[4] = {0, 0, 1, -1};
+		int dx[4] = { 1, -1, 0, 0 };
+		int dy[4] = { 0, 0, 1, -1 };
 
 		while (!q.empty() && !found)
 		{
@@ -110,13 +130,13 @@ void AGridGenerator::GenerateGrid(FVector gridOffset)
 
 				if (MazeGrid[ny][nx] == "Path")
 				{
-					nearestPath = {nx, ny};
+					nearestPath = { nx, ny };
 					found = true;
 					break;
 				}
 				else if (MazeGrid[ny][nx] == "Empty")
 				{
-					q.push({nx, ny});
+					q.push({ nx, ny });
 				}
 			}
 		}
@@ -125,6 +145,7 @@ void AGridGenerator::GenerateGrid(FVector gridOffset)
 		{
 			// Carve path from nearestPath to key
 			Cell c = nearestPath;
+
 			while (!(c.x == keyX && c.y == keyY))
 			{
 				if (c.x < keyX) c.x++;
@@ -139,12 +160,17 @@ void AGridGenerator::GenerateGrid(FVector gridOffset)
 			}
 
 			MazeGrid[keyY][keyX] = "Key";
+
+			PlacedKeys.Add({ keyX, keyY }); // Store key position
 			keysPlaced++;
+
 			UE_LOG(LogTemp, Warning, TEXT("Placed a key at (%d, %d)"), keyY, keyX);
 		}
 	}
+	
+	// Step 5: Place enemies with spacing rules
 
-	int maxEnemies = 1;
+	int maxEnemies = 4;
 	int minDistanceFromEntrance = 7;   // tweak
 	int minDistanceBetweenEnemies = 5; // tweak
 
